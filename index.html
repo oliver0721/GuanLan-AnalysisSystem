@@ -1,0 +1,384 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>观澜·舆情大数据研判系统 | GuanLan Analysis System</title>
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    <link rel="stylesheet" href="https://unpkg.com/element-plus/dist/index.css" />
+    <script src="https://unpkg.com/element-plus"></script>
+    <script src="https://unpkg.com/@element-plus/icons-vue"></script>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+
+    <style>
+        /* --- 学术严谨风格配色 --- */
+        :root {
+            --primary-bg: #003366;      /* 海军蓝 */
+            --primary-text: #ffffff;
+            --main-bg: #f4f6f9;         /* 浅灰背景 */
+            --card-bg: #ffffff;
+            --text-main: #2d3748;
+            --border: #e2e8f0;
+        }
+
+        body { margin: 0; background-color: var(--main-bg); font-family: 'PingFang SC', 'Microsoft YaHei', sans-serif; color: var(--text-main); height: 100vh; overflow: hidden; }
+        #app { display: flex; height: 100%; width: 100%; }
+
+        /* 左侧侧边栏 */
+        .sidebar {
+            width: 340px; flex-shrink: 0;
+            background-color: var(--primary-bg); color: var(--primary-text);
+            display: flex; flex-direction: column;
+            box-shadow: 4px 0 10px rgba(0,0,0,0.1); z-index: 10;
+        }
+        .brand-area { padding: 25px; background: rgba(0,0,0,0.1); border-bottom: 1px solid rgba(255,255,255,0.1); }
+        .brand-title { font-size: 20px; font-weight: 600; display: flex; align-items: center; letter-spacing: 1px; }
+        .config-area { flex: 1; padding: 20px; overflow-y: auto; }
+
+        .glass-card { background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; padding: 15px; margin-bottom: 20px; }
+        .glass-title { font-size: 13px; font-weight: bold; color: #90cdf4; margin-bottom: 12px; display: flex; align-items: center; }
+        .label { font-size: 12px; color: #a0aec0; margin-bottom: 5px; margin-top: 10px; }
+
+        .history-item { padding: 10px; font-size: 13px; color: #cbd5e0; border-bottom: 1px solid rgba(255,255,255,0.05); cursor: pointer; transition: 0.2s; }
+        .history-item:hover { background: rgba(255,255,255,0.1); color: #fff; padding-left: 15px; }
+
+        /* 右侧主区域 */
+        .main-content { flex: 1; display: flex; flex-direction: column; background: var(--main-bg); min-width: 0; }
+
+        /* 顶部热搜 */
+        .top-bar { height: 50px; background: #fff; border-bottom: 1px solid var(--border); display: flex; align-items: center; padding: 0 20px; box-shadow: 0 2px 5px rgba(0,0,0,0.02); white-space: nowrap; }
+        .hot-label { font-weight: bold; color: #c53030; margin-right: 15px; display: flex; align-items: center; flex-shrink: 0; font-size: 14px; }
+        .hot-list { flex: 1; display: flex; align-items: center; gap: 10px; overflow-x: auto; padding-bottom: 5px; scrollbar-width: none; -ms-overflow-style: none; }
+        .hot-list::-webkit-scrollbar { display: none; }
+        .hot-tag { cursor: pointer; border: 1px solid #ffecec; background: #fff5f5; color: #c53030; font-size: 12px; transition: 0.2s; flex-shrink: 0; }
+        .hot-tag:hover { background: #c53030; color: #fff; border-color: #d93025; }
+
+        /* --- 核心修复：工作区布局 --- */
+        .work-area {
+            flex: 1;
+            padding: 30px;
+            overflow-y: auto;
+            /* 关键修改：移除 display: flex，改用默认的 block 布局 */
+            /* 这能完美解决长内容背景截断的问题 */
+            display: block;
+            position: relative;
+        }
+
+        .search-hero {
+            width: 100%;
+            max-width: 800px;
+            text-align: center;
+            /* 在 block 布局下，使用 margin: auto 实现水平居中 */
+            margin: 30px auto;
+            transition: all 0.5s;
+        }
+        .hero-title { font-size: 32px; color: var(--primary-bg); margin-bottom: 30px; font-weight: 700; letter-spacing: 2px; text-align: center; }
+
+        .progress-container { width: 100%; max-width: 800px; margin: 40px auto; padding: 20px; background: #fff; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.03); border: 1px solid #eef1f6; }
+        .status-text { text-align: center; margin-top: 20px; color: #606266; font-size: 14px; display: flex; justify-content: center; align-items: center; }
+
+        /* --- 核心修复：报告卡片样式 --- */
+        .report-paper {
+            width: 100%;
+            max-width: 900px;
+            margin: 20px auto; /* 确保居中 */
+            background: #fff;
+            padding: 60px;
+            border-radius: 4px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.05);
+            min-height: 600px;
+            border: 1px solid #e2e8f0;
+            /* 确保高度自动撑开 */
+            height: auto;
+            overflow: visible;
+        }
+        .paper-header { border-bottom: 2px solid var(--primary-bg); padding-bottom: 20px; margin-bottom: 40px; display: flex; justify-content: space-between; align-items: flex-end; }
+        .paper-title { font-size: 24px; font-weight: bold; color: var(--primary-bg); }
+
+        .md-body { font-family: 'Times New Roman', 'SimSun', serif; line-height: 1.8; color: #000; font-size: 16px; }
+        .md-body h1, .md-body h2 { font-family: 'Microsoft YaHei', sans-serif; color: var(--primary-bg); border-bottom: 1px solid #eee; margin-top: 30px; }
+        .md-body img { max-width: 90%; display: block; margin: 20px auto; border: 1px solid #ddd; padding: 4px; background: #fff; }
+        .caption { text-align: center; font-size: 14px; color: #666; font-style: italic; margin-bottom: 30px; }
+
+        .sidebar .el-input__wrapper { background-color: rgba(0,0,0,0.2) !important; box-shadow: none !important; border: 1px solid rgba(255,255,255,0.2) !important; color: #fff; }
+        .sidebar .el-input__inner { color: #fff !important; }
+        .sidebar .el-select .el-input__wrapper { box-shadow: none !important; }
+        .el-select-dropdown__item { font-size: 13px; }
+
+        .fade-enter-active, .fade-leave-active { transition: opacity 0.5s; }
+        .fade-enter-from, .fade-leave-to { opacity: 0; }
+    </style>
+</head>
+<body>
+    <div id="app">
+        <aside class="sidebar">
+            <div class="brand-area" style="display: flex; flex-direction: column; align-items: center;">
+                <div class="brand-title" style="justify-content: center;">
+                    <el-icon style="margin-right:10px"><School /></el-icon> 微博舆情研判分析系统
+                </div>
+
+                <div style="font-size:12px; opacity:0.6; margin-top:5px; letter-spacing: 0.5px; text-align: center;">
+                GuanLan Analysis System
+                </div>
+            </div>
+
+            <div class="config-area">
+                <div class="glass-card">
+                    <div class="glass-title"><el-icon style="margin-right:5px"><Cpu /></el-icon> LLM 引擎配置</div>
+                    <div class="label">选择模型 (Provider)</div>
+                    <el-select v-model="selectedPreset" @change="applyPreset" style="width: 100%" placeholder="点击选择模型">
+                        <el-option-group label="🇨🇳 国内大模型">
+                            <el-option label="🌋 火山引擎 (Volcengine)" value="volc"></el-option>
+                            <el-option label="🐳 DeepSeek (深度求索)" value="deepseek"></el-option>
+                            <el-option label="🤖 智谱 AI (GLM-4)" value="zhipu"></el-option>
+                            <el-option label="🌙 Kimi (月之暗面)" value="kimi"></el-option>
+                            <el-option label="🐈 通义千问 (Qwen)" value="qwen"></el-option>
+                        </el-option-group>
+                        <el-option-group label="🌏 国际大模型">
+                            <el-option label="🧠 OpenAI (GPT-4o)" value="openai"></el-option>
+                            <el-option label="✨ Google Gemini" value="gemini"></el-option>
+                            <el-option label="🎭 Anthropic Claude" value="claude"></el-option>
+                        </el-option-group>
+                    </el-select>
+                    <div class="label">API Key</div>
+                    <el-input v-model="config.apiKey" type="password" size="small" show-password placeholder="sk-..."></el-input>
+                    <div class="label">Model Name</div>
+                    <el-input v-model="config.model" size="small"></el-input>
+                    <div class="label">Base URL</div>
+                    <el-input v-model="config.baseUrl" size="small" placeholder="默认留空"></el-input>
+                </div>
+
+                <div class="glass-card">
+                    <div class="glass-title"><el-icon style="margin-right:5px"><Key /></el-icon> 数据源授权</div>
+                    <div class="label">微博 Cookie</div>
+                    <el-input v-model="config.cookie" type="textarea" :rows="2" size="small" placeholder="粘贴 Cookie 字符串"></el-input>
+                    <el-button type="primary" size="small" style="width:100%; margin-top:10px; background:#409EFF; border:none;" @click="updateCookie">保存 Cookie</el-button>
+                </div>
+
+                <div style="font-weight:bold; font-size:13px; margin-bottom:10px; color:#90cdf4; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 15px;">
+                    <el-icon style="margin-right: 5px; vertical-align: middle;"><Files /></el-icon> 分析档案
+                </div>
+                <div v-for="(h, i) in history" :key="i" class="history-item" @click="loadHistory(h)">
+                    {{ h.keyword }}
+                    <span style="font-size:10px; opacity:0.5; float:right; margin-top: 2px;">{{ h.time }}</span>
+                </div>
+            </div>
+        </aside>
+
+        <main class="main-content">
+            <header class="top-bar">
+                <div class="hot-label"><el-icon style="margin-right:5px"><Trend_Charts /></el-icon> 实时热搜</div>
+                <div class="hot-list" v-loading="loadingHot">
+                    <span v-if="hotList.length === 0" style="font-size:12px; color:#999">正在尝试连接微博热搜...</span>
+                    <el-tag v-for="(item, index) in hotList" :key="index" class="hot-tag" effect="plain" round @click="keyword = item.title">
+                        {{ index+1 }}. {{ item.title }}
+                    </el-tag>
+                </div>
+            </header>
+
+            <div class="work-area">
+                <div class="search-hero">
+                    <div class="hero-title">新浪微博舆情大数据研判平台</div>
+                    <div style="display:flex; gap:10px; justify-content:center;">
+                        <el-input v-model="keyword" placeholder="请输入话题关键词 或 点击上方热搜" size="large" style="width:500px; box-shadow: 0 4px 10px rgba(0,0,0,0.05);">
+                            <template #prefix><el-icon><Search /></el-icon></template>
+                        </el-input>
+                        <el-button type="primary" size="large" @click="startAnalysis" :loading="loading" style="background:var(--primary-bg); padding: 0 30px; font-weight: bold;">
+                            生成深度报告
+                        </el-button>
+                    </div>
+
+                    <transition name="fade">
+                        <div v-if="loading" class="progress-container">
+                            <el-steps :active="activeStep" finish-status="success" align-center>
+                                <el-step title="信息爬取" description="Selenium 数据采集"></el-step>
+                                <el-step title="数据清洗" description="NLP 情感计算/绘图"></el-step>
+                                <el-step title="AI 研判" description="LLM 深度分析"></el-step>
+                                <el-step title="文档生成" description="Word 报告导出"></el-step>
+                            </el-steps>
+                            <div class="status-text">
+                                <el-icon class="is-loading" style="margin-right: 8px"><Loading /></el-icon>
+                                {{ currentStatusText }}
+                            </div>
+                        </div>
+                    </transition>
+                </div>
+
+                <transition name="fade">
+                    <div v-if="result" class="report-paper">
+                        <div class="paper-header">
+                            <div class="paper-title">分析报告：{{ keyword }}</div>
+                            <a :href="'/files?path=' + result.doc_path" target="_blank">
+                                <el-button type="success" plain icon="Download">下载 Word 文档</el-button>
+                            </a>
+                        </div>
+                        <div class="md-body" v-html="markdownToHtml"></div>
+                    </div>
+                </transition>
+
+                <div style="height: 100px;"></div>
+            </div>
+        </main>
+    </div>
+
+    <script>
+        const { createApp, ref, reactive, computed, onMounted } = Vue;
+        const { ElMessage } = ElementPlus;
+
+        createApp({
+            setup() {
+                const config = reactive({
+                    apiKey: localStorage.getItem('api_key') || '',
+                    model: localStorage.getItem('model') || '',
+                    baseUrl: localStorage.getItem('base_url') || '',
+                    cookie: ''
+                });
+
+                const selectedPreset = ref('');
+                const keyword = ref('');
+                const hotList = ref([]);
+                const loading = ref(false);
+                const loadingHot = ref(false);
+                const result = ref(null);
+                const history = ref(JSON.parse(localStorage.getItem('history') || '[]'));
+                const activeStep = ref(0);
+                const currentStatusText = ref('准备就绪');
+
+                const applyPreset = () => {
+                    const val = selectedPreset.value;
+                    if (val === 'deepseek') {
+                        config.model = 'deepseek/deepseek-chat';
+                        config.baseUrl = 'https://api.deepseek.com';
+                    } else if (val === 'volc') {
+                        config.model = 'openai/ep-2025xxxx';
+                        config.baseUrl = 'https://ark.cn-beijing.volces.com/api/v3';
+                        ElMessage.info('请在 Model Name 中填入您的 Endpoint ID');
+                    } else if (val === 'openai') {
+                        config.model = 'openai/gpt-4o';
+                        config.baseUrl = '';
+                    } else if (val === 'gemini') {
+                        config.model = 'gemini/gemini-pro';
+                        config.baseUrl = '';
+                    } else if (val === 'claude') {
+                        config.model = 'anthropic/claude-3-opus-20240229';
+                        config.baseUrl = '';
+                    } else if (val === 'zhipu') {
+                        config.model = 'zhipu/glm-4';
+                        config.baseUrl = '';
+                    } else if (val === 'kimi') {
+                        config.model = 'moonshot/moonshot-v1-8k';
+                        config.baseUrl = '';
+                    } else if (val === 'qwen') {
+                        config.model = 'dashscope/qwen-turbo';
+                        config.baseUrl = '';
+                    }
+                };
+
+                const fetchHot = async () => {
+                    loadingHot.value = true;
+                    try {
+                        const res = await fetch('/api/hot_search');
+                        const data = await res.json();
+                        if (data.status === 'success') hotList.value = data.data;
+                    } catch (e) { console.error(e); }
+                    loadingHot.value = false;
+                };
+
+                onMounted(fetchHot);
+
+                const updateCookie = async () => {
+                    if(!config.cookie) return ElMessage.warning('Cookie 不能为空');
+                    try {
+                        const res = await fetch('/api/update_cookie', {
+                            method: 'POST',
+                            headers: {'Content-Type': 'application/json'},
+                            body: JSON.stringify({cookie: config.cookie})
+                        });
+                        if((await res.json()).status === 'success') ElMessage.success('Cookie 已更新');
+                    } catch(e) { ElMessage.error('更新失败'); }
+                };
+
+                const startAnalysis = async () => {
+                    if(!keyword.value) return ElMessage.warning('请输入关键词');
+                    if(!config.apiKey) return ElMessage.error('API Key 缺失');
+
+                    localStorage.setItem('api_key', config.apiKey);
+                    localStorage.setItem('model', config.model);
+                    localStorage.setItem('base_url', config.baseUrl);
+
+                    if (!history.value.some(h => h.keyword === keyword.value)) {
+                        history.value.unshift({keyword: keyword.value, time: new Date().toLocaleDateString()});
+                        localStorage.setItem('history', JSON.stringify(history.value));
+                    }
+
+                    loading.value = true;
+                    result.value = null;
+                    activeStep.value = 1;
+                    currentStatusText.value = '正在接入微博数据源，启动 Selenium 爬虫...';
+
+                    const timer = setInterval(() => {
+                        if (activeStep.value === 1) {
+                            currentStatusText.value = '正在翻页抓取数据，解析 HTML 结构...';
+                            setTimeout(() => { if(loading.value) { activeStep.value = 2; currentStatusText.value = '爬取完成，正在进行 NLP 情感打分与绘图...'; } }, 15000);
+                        } else if (activeStep.value === 2) {
+                            setTimeout(() => { if(loading.value) { activeStep.value = 3; currentStatusText.value = '正在调用大模型生成深度研判报告...'; } }, 10000);
+                        } else if (activeStep.value === 3) {
+                            setTimeout(() => { if(loading.value) { activeStep.value = 4; currentStatusText.value = '正在排版并生成 Word 文档...'; } }, 10000);
+                        }
+                    }, 1000);
+
+                    try {
+                        const res = await fetch('/api/analyze', {
+                            method: 'POST',
+                            headers: {'Content-Type': 'application/json'},
+                            body: JSON.stringify({
+                                keyword: keyword.value,
+                                api_key: config.apiKey,
+                                model: config.model,
+                                base_url: config.baseUrl
+                            })
+                        });
+                        const data = await res.json();
+
+                        clearInterval(timer);
+
+                        if(data.status === 'success') {
+                            activeStep.value = 5;
+                            currentStatusText.value = '分析完成！';
+                            result.value = data;
+                            ElMessage.success('报告生成成功');
+                        } else {
+                            ElMessage.error(data.message);
+                            loading.value = false;
+                        }
+                    } catch(e) {
+                        clearInterval(timer);
+                        ElMessage.error('请求出错');
+                        loading.value = false;
+                    } finally {
+                        if (result.value) {
+                            setTimeout(() => { loading.value = false; }, 800);
+                        }
+                    }
+                };
+
+                const markdownToHtml = computed(() => {
+                    if(!result.value) return '';
+                    let text = result.value.analysis;
+                    const imgs = result.value.images;
+
+                    const tpl = (src, cap) => `\n\n<div style="text-align:center"><img src="/files?path=${src}" /><div class="caption">${cap}</div></div>\n\n`;
+
+                    if(imgs.sentiment) text = text.replace(/\(此处插入情感分布图\)/g, tpl(imgs.sentiment, '图1：情感倾向分布'));
+                    if(imgs.trend) text = text.replace(/\(此处插入趋势图\)/g, tpl(imgs.trend, '图2：舆情热度趋势'));
+                    if(imgs.wordcloud) text = text.replace(/\(此处插入词云图\)/g, tpl(imgs.wordcloud, '图3：核心议题词云'));
+
+                    return marked.parse(text);
+                });
+
+                return { config, selectedPreset, keyword, hotList, loading, loadingHot, result, history, activeStep, currentStatusText, applyPreset, updateCookie, startAnalysis, markdownToHtml, loadHistory: (h)=>keyword.value=h.keyword };
+            }
+        }).use(ElementPlus).mount('#app');
+    </script>
+</body>
+</html>
